@@ -1,43 +1,48 @@
-import argparse
-from time import time
-import matplotlib
 import matplotlib.pyplot as plt
-from matplotlib.pyplot import imshow
 import numpy as np
-import pandas as pd
-from sklearn.preprocessing import LabelEncoder, OneHotEncoder
-from sklearn.model_selection import train_test_split
 
-import torch
-from torch.autograd import Variable
 import torch.utils.data as data
 import torch.nn as nn
 import torch.optim as optim
+import torch
+class simpleDataset(data.Dataset):
+    def __init__(self, X, y):
+        self.X=X
+        self.y=y
 
-# from model import MultiLayerPerceptron
-# from dataset import AdultDataset
+    def __len__(self):
+        return len(self.y)
+
+    def __getitem__(self, index):
+        return self.X[index], self.y[index]
+possibleRes=torch.as_tensor(np.array([0,1])).float()
+
 class NNHandler:
+    #TODO: add return information (history, epochs...)
     model:nn.Module
-    lossFunc:nn._Loss
-    optimizer:optim.optimzer
-    loaders = []
+    lossFunc:nn.Module
+    optimizer:optim
     lr:float
     epochs:int
-    verbose:bool=False
-    histories=[[],[]]
     #There's also self.correctness
-
-    def loadModel(self, model, lossFunc, optimizer, lr):
+    def __init__(self):
+        self.verbose:bool=False
+        self.histories=[[],[]]
+        self.loaders=[]
+    def printAlt(self, *args):
+        if self.verbose==True:
+            print(*args)
+    def loadModel(self, model, optimizer, lr, lossFunc=nn.MSELoss()):
         ######
         # 4.4 YOUR CODE HERE
         self.model = model
-        self.lossFunc =lossFunc
         self.optimizer = optimizer
+        self.lossFunc =lossFunc
         self.lr=lr
         ######
 
-    def loadData(self, batch_size,sets_of_data):
-
+    def loadData(self, sets_of_data,batch_size):
+        #TODO: GPU mem pin
         """
         :param batch_size: iterable of sizes
         :param sets_of_data: iterable of datasets
@@ -48,10 +53,6 @@ class NNHandler:
     def loadCorrectness(self, correctness=lambda x,y: x==y):
         self.correctness=correctness
 
-
-    def printAlt(self, arg):
-        if self.verbose==True:
-            print(arg)
     def evalLossesAccs(self, ind):
         X, y = next(iter(self.loaders[ind]))
         X = X.float()
@@ -60,18 +61,13 @@ class NNHandler:
 
         # accuracy
         predict = self.model(X)
-        corr = []
-        for i in range(len(y)):
-            corr.append(self.correctness(predict[i], y[i]))
-            # print ("comparing", predict[i], y[i], "\n")
-        acc = float(sum(corr)) / len(y)
+        acc = float(sum(self.correctness(predict, y).float())) / len(y)
 
         # loss
         loss = self.lossFunc(input=predict.squeeze(), target=y)
-        print(loss.item(), acc)
         ######
         return [loss.item(), acc]
-    def train(self, epochs, trainInd=0, evalInd=None, graphRate=10, printVerbose=False, graphVerbose=False):
+    def train(self, epochs, trainInd=0, evalInd=None,  printVerbose=False, graphVerbose=False,graphRate=10):
         #TODO:evalInd to have test data too (maybe)
         """
 
@@ -106,8 +102,10 @@ class NNHandler:
             # record data for plotting
 
             self.histories[0].append(self.evalLossesAccs(trainInd))
+            self.printAlt(self.histories[0][-1])
             if not evalInd is None:
                 self.histories[1].append(self.evalLossesAccs(evalInd))
+                self.printAlt(self.histories[1][-1])
 
             if graphVerbose and i % graphRate == 0:
                 t_losses_accs_arr = np.array(self.histories[0])
@@ -133,4 +131,26 @@ class NNHandler:
                 plt.ylabel('Accuracy')
                 plt.show()
                 #TODO: Add maybe time
-        return 1
+if __name__=="__main__":
+    myNNHandler=NNHandler()
+
+
+
+    possibleRes=torch.as_tensor(np.array([0,1])).float()
+
+    myNNHandler.loadCorrectness(lambda x,y: torch.eq(torch.argmin((x - possibleRes).abs(), dim=1).float(), y))
+    tttIn=np.random.randint(0,2,[100,9])
+    tttOut=np.array([(tttIn[i,0] and tttIn[i,4] and tttIn[i,8]) or (tttIn[i,2] and tttIn[i,4] and tttIn[i,6]) for i in range(100)])
+    tttData=simpleDataset(tttIn,tttOut)
+    print(tttIn,tttOut)
+
+    model=nn.Linear(9,1)
+    lr=0.1
+
+
+    optimizer=optim.SGD(model.parameters(), lr)
+    myNNHandler.loadModel(model,optimizer,lr)
+    myNNHandler.loadData([tttData],[len(tttData)])
+    print(myNNHandler.evalLossesAccs(0))
+
+    myNNHandler.train(60,printVerbose=True, graphVerbose=True)
