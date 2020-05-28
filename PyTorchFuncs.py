@@ -12,57 +12,112 @@ import torch
 from torch.autograd import Variable
 import torch.utils.data as data
 import torch.nn as nn
+import torch.optim as optim
 
 # from model import MultiLayerPerceptron
 # from dataset import AdultDataset
 class NNHandler:
-    network:nn.Module
-    def load_data(batch_size,sets_of_data):
+    model:nn.Module
+    lossFunc:nn._Loss
+    optimizer:optim.optimzer
+    loaders = []
+    lr:float
+    epochs:int
+    verbose:bool=False
+    histories=[[],[]]
+    #There's also self.correctness
+
+    def loadModel(self, model, lossFunc, optimizer, lr):
         ######
+        # 4.4 YOUR CODE HERE
+        self.model = model
+        self.lossFunc =lossFunc
+        self.optimizer = optimizer
+        self.lr=lr
+        ######
+
+    def loadData(self, batch_size,sets_of_data):
+
         """
         :param batch_size: iterable of sizes
         :param sets_of_data: iterable of datasets
         :return:
         """
-        loaders = []
-        # 4.1 YOUR CODE HERE
         for i in range(len(sets_of_data)):
-            loaders.append(data.DataLoader(sets_of_data[i], batch_size=batch_size[i], shuffle=True, num_workers=2))
+            self.loaders.append(data.DataLoader(sets_of_data[i], batch_size=batch_size[i], shuffle=True, num_workers=2))
+    def loadCorrectness(self, correctness=lambda x,y: x==y):
+        self.correctness=correctness
+
+
+    def printAlt(self, arg):
+        if self.verbose==True:
+            print(arg)
+    def evalLossesAccs(self, ind):
+        X, y = next(iter(self.loaders[ind]))
+        X = X.float()
+        y = y.float()
+        total_corr = 0
+
+        # accuracy
+        predict = self.model(X)
+        corr = []
+        for i in range(len(y)):
+            corr.append(self.correctness(predict[i], y[i]))
+            # print ("comparing", predict[i], y[i], "\n")
+        acc = float(sum(corr)) / len(y)
+
+        # loss
+        loss = self.lossFunc(input=predict.squeeze(), target=y)
+        print(loss.item(), acc)
         ######
-        return loaders
+        return [loss.item(), acc]
+    def train(self, epochs, trainInd=0, evalInd=None, graphRate=10, printVerbose=False, graphVerbose=False):
+        #TODO:evalInd to have test data too (maybe)
+        """
 
-    def train():
+        :param epochs:
+        :param trainInd: default is first dataloader
+        :param evalInd: default is second dataloader
+        :param printVerbose:
+        :return:
+        """
+        self.epochs=epochs
+        self.verbose=printVerbose
         for i in range(epochs):
-
-            print("\n", i, "newepoch\n")
-            for j, batch_data in enumerate(t_im_loader, 0):
-                print("batch#", j)
+            self.printAlt("\n", i, "newepoch\n")
+            for j, batch_data in enumerate(self.loaders[trainInd], 0):
+                self.printAlt("batch#", j)
                 X = batch_data[0]
                 y = batch_data[1]
-                optimizer.zero_grad()
+                self.optimizer.zero_grad()
                 # https://towardsdatascience.com/understanding-pytorch-with-an-example-a-step-by-step-tutorial-81fc5f8c4e8e
                 X = X.float()
                 y = y.float()
-                predict = model(X)  # squeeze and relu reduce # of channel
+                predict = self.model(X)  # squeeze and relu reduce # of channel
                 # print (predict.data)
-                loss = loss_fnc(input=predict.squeeze(), target=y)
+                loss = self.lossFunc(input=predict.squeeze(), target=y)
 
                 loss.backward()  # compute the gradients of the weights
 
-                optimizer.step()  # this changes the weights and the bias using the learningrate and gradients
+                self.optimizer.step()  # this changes the weights and the bias using the learningrate and gradients
 
                 #   compute the accuracy of the model on the validation data  (don't normally do this every epoch, but is OK here)
 
             # record data for plotting
-            X, y = next(iter(t_im_loader_all))
-            X = X.float()
-            y = y.float()
-            t_losses_accs.append(eval_losses_accs(model, X, y, loss_fnc))
-            if (i % 10 == 0):
-                t_losses_accs_arr = np.array(t_losses_accs)
-                print(t_losses_accs_arr.shape)
+
+            self.histories[0].append(self.evalLossesAccs(trainInd))
+            if not evalInd is None:
+                self.histories[1].append(self.evalLossesAccs(evalInd))
+
+            if graphVerbose and i % graphRate == 0:
+                t_losses_accs_arr = np.array(self.histories[0])
+                self.printAlt(t_losses_accs_arr.shape)
                 plt.figure()
                 plt.plot(np.arange(0, i + 1), t_losses_accs_arr[:, 0])
+                if not evalInd is None:
+                    v_losses_accs_arr = np.array(self.histories[1])
+                    plt.plot(np.arange(0, i + 1), v_losses_accs_arr[:, 0])
+
                 plt.title('Training Loss vs. Epoch')
                 plt.xlabel('epoch')
                 plt.ylabel('Loss')
@@ -70,10 +125,12 @@ class NNHandler:
 
                 plt.figure()
                 plt.plot(np.arange(0, i + 1), t_losses_accs_arr[:, 1])
+                if not evalInd is None:
+                    plt.plot(np.arange(0, i + 1), v_losses_accs_arr[:, 1])
+
                 plt.title('Accuracy vs. Epoch')
                 plt.xlabel('epoch')
                 plt.ylabel('Accuracy')
                 plt.show()
-                end = time()
-                print(end, start, end - start)
+                #TODO: Add maybe time
         return 1
