@@ -133,16 +133,12 @@ class NNHandler:
                 #TODO: Add maybe time
 if __name__=="__main__":
     myNNHandler=NNHandler()
-
-
-
     possibleRes=torch.as_tensor(np.array([0,1])).float()
 
     myNNHandler.loadCorrectness(lambda x,y: torch.eq(torch.argmin((x - possibleRes).abs(), dim=1).float(), y))
     tttIn=np.random.randint(0,2,[100,9])
     tttOut=np.array([(tttIn[i,0] and tttIn[i,4] and tttIn[i,8]) or (tttIn[i,2] and tttIn[i,4] and tttIn[i,6]) for i in range(100)])
     tttData=simpleDataset(tttIn,tttOut)
-    print(tttIn,tttOut)
 
     model=nn.Linear(9,1)
     lr=0.1
