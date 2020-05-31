@@ -154,23 +154,27 @@ if __name__=="__main__":
     # myNNHandler.train(60,printVerbose=True, graphVerbose=False)
     X = torch.as_tensor(tttIn).float()
     y = torch.as_tensor(tttOut).float()
+    combine=simpleDataset(X,y)
+    loader= data.DataLoader(combine, batch_size=100, shuffle=True, num_workers=0)
+
     for i in range(100):
-        print("\n", i, "newepoch\n")
+        for j, batch_data in enumerate(loader, 0):
+            print("\n", i, "newepoch\n")
 
-        optimizer.zero_grad()
-        # https://towardsdatascience.com/understanding-pytorch-with-an-example-a-step-by-step-tutorial-81fc5f8c4e8e
+            optimizer.zero_grad()
+            # https://towardsdatascience.com/understanding-pytorch-with-an-example-a-step-by-step-tutorial-81fc5f8c4e8e
 
-        predict = model(X)  # squeeze and relu reduce # of channel
-        # print (predict.data)
-        loss = lossFunc(input=predict.squeeze(), target=y)
+            predict = model(X)  # squeeze and relu reduce # of channel
+            # print (predict.data)
+            loss = lossFunc(input=predict.squeeze(), target=y)
 
-        loss.backward()  # compute the gradients of the weights
+            loss.backward()  # compute the gradients of the weights
 
-        optimizer.step()  # this changes the weights and the bias using the learningrate and gradients
+            optimizer.step()  # this changes the weights and the bias using the learningrate and gradients
 
-            #   compute the accuracy of the model on the validation data  (don't normally do this every epoch, but is OK here)
+                #   compute the accuracy of the model on the validation data  (don't normally do this every epoch, but is OK here)
 
-        # record data for plotting
+            # record data for plotting
 
         total_corr = 0
 
