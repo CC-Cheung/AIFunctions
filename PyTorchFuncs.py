@@ -5,6 +5,33 @@ import torch.utils.data as data
 import torch.nn as nn
 import torch.optim as optim
 import torch
+#from https://github.com/pytorch/pytorch/issues/15849
+class _RepeatSampler(object):
+    """ Sampler that repeats forever.
+
+    Args:
+        sampler (Sampler)
+    """
+
+    def __init__(self, sampler):
+        self.sampler = sampler
+
+    def __iter__(self):
+        while True:
+            yield from iter(self.sampler)
+class FastDataLoader(data.dataloader.DataLoader):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        object.__setattr__(self, 'batch_sampler', _RepeatSampler(self.batch_sampler))
+        self.iterator = super().__iter__()
+
+    def __len__(self):
+        return len(self.batch_sampler.sampler)
+
+    def __iter__(self):
+        for i in range(len(self)):
+            yield next(self.iterator)
 class simpleDataset(data.Dataset):
     def __init__(self, X, y):
         self.X=X
@@ -49,7 +76,7 @@ class NNHandler:
         :return:
         """
         for i in range(len(sets_of_data)):
-            self.loaders.append(data.DataLoader(sets_of_data[i], batch_size=batch_size[i], shuffle=True, num_workers=2))
+            self.loaders.append(FastDataLoader(sets_of_data[i], batch_size=batch_size[i], shuffle=True, num_workers=2))
     def loadCorrectness(self, correctness=lambda x,y: x==y):
         self.correctness=correctness
 
