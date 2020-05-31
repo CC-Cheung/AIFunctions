@@ -247,7 +247,7 @@ if __name__=="__main__":
     tttOut = np.expand_dims(np.array(
         [(tttIn[i, 0] and tttIn[i, 4] and tttIn[i, 8]) or (tttIn[i, 2] and tttIn[i, 4] and tttIn[i, 6]) for i in
          range(100)]), axis=1)
-    for i in range (1000000):
+    for i in range (100):
         print(model.train(tttIn,tttOut))
         print(np.sum((model.predict(tttIn)<0.5)==(tttOut<0.5))/100)
     # model.highLossWbAdjust(1)

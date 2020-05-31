@@ -132,21 +132,43 @@ class NNHandler:
                 plt.show()
                 #TODO: Add maybe time
 if __name__=="__main__":
-    myNNHandler=NNHandler()
-    possibleRes=torch.as_tensor(np.array([0,1])).float()
-
-    myNNHandler.loadCorrectness(lambda x,y: torch.eq(torch.argmin((x - possibleRes).abs(), dim=1).float(), y))
+    # myNNHandler=NNHandler()
+    # possibleRes=torch.as_tensor(np.array([0,1])).float()
+    #
+    # myNNHandler.loadCorrectness(lambda x,y: torch.eq(torch.argmin((x - possibleRes).abs(), dim=1).float(), y))
     tttIn=np.random.randint(0,2,[100,9])
     tttOut=np.array([(tttIn[i,0] and tttIn[i,4] and tttIn[i,8]) or (tttIn[i,2] and tttIn[i,4] and tttIn[i,6]) for i in range(100)])
-    tttData=simpleDataset(tttIn,tttOut)
+    # tttData=simpleDataset(tttIn,tttOut)
 
     model=nn.Linear(9,1)
     lr=0.1
 
 
     optimizer=optim.SGD(model.parameters(), lr)
-    myNNHandler.loadModel(model,optimizer,lr)
-    myNNHandler.loadData([tttData],[len(tttData)])
-    print(myNNHandler.evalLossesAccs(0))
+    lossFunc=nn.MSELoss()
+    # myNNHandler.loadModel(model,optimizer,lr)
+    # myNNHandler.loadData([tttData],[len(tttData)])
+    # print(myNNHandler.evalLossesAccs(0))
+    #
+    # myNNHandler.train(60,printVerbose=True, graphVerbose=False)
+    X = torch.as_tensor(tttIn).float()
+    y = torch.as_tensor(tttOut).float()
+    for i in range(100):
+        print("\n", i, "newepoch\n")
 
-    myNNHandler.train(60,printVerbose=True, graphVerbose=True)
+        optimizer.zero_grad()
+        # https://towardsdatascience.com/understanding-pytorch-with-an-example-a-step-by-step-tutorial-81fc5f8c4e8e
+
+        predict = model(X)  # squeeze and relu reduce # of channel
+        # print (predict.data)
+        loss = lossFunc(input=predict.squeeze(), target=y)
+
+        loss.backward()  # compute the gradients of the weights
+
+        optimizer.step()  # this changes the weights and the bias using the learningrate and gradients
+
+            #   compute the accuracy of the model on the validation data  (don't normally do this every epoch, but is OK here)
+
+        # record data for plotting
+
+
