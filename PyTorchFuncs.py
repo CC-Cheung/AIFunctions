@@ -5,11 +5,39 @@ import torch.utils.data as data
 import torch.nn as nn
 import torch.optim as optim
 import torch
+
+#from https://github.com/pytorch/pytorch/issues/15849
+class _RepeatSampler(object):
+    """ Sampler that repeats forever.
+
+    Args:
+        sampler (Sampler)
+    """
+
+    def __init__(self, sampler):
+        self.sampler = sampler
+
+    def __iter__(self):
+        while True:
+            yield from iter(self.sampler)
+class FastDataLoader(data.dataloader.DataLoader):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        object.__setattr__(self, 'batch_sampler', _RepeatSampler(self.batch_sampler))
+        self.iterator = super().__iter__()
+
+    def __len__(self):
+        return len(self.batch_sampler.sampler)
+
+    def __iter__(self):
+        for i in range(len(self)):
+            yield next(self.iterator)
+
 class simpleDataset(data.Dataset):
     def __init__(self, X, y):
         self.X=X
         self.y=y
-
     def __len__(self):
         return len(self.y)
 
@@ -137,8 +165,9 @@ if __name__=="__main__":
     #
     correctness=lambda x, y: torch.eq(torch.argmin((x - possibleRes).abs(), dim=1).float(), y)
     # myNNHandler.loadCorrectness(correctness())
-    tttIn=np.random.randint(0,2,[100,9])
-    tttOut=np.array([(tttIn[i,0] and tttIn[i,4] and tttIn[i,8]) or (tttIn[i,2] and tttIn[i,4] and tttIn[i,6]) for i in range(100)])
+    numExamples=10000
+    tttIn=np.random.randint(0,2,[numExamples,9])
+    tttOut=np.array([(tttIn[i,0] and tttIn[i,4] and tttIn[i,8]) or (tttIn[i,2] and tttIn[i,4] and tttIn[i,6]) for i in range(numExamples)])
     # tttData=simpleDataset(tttIn,tttOut)
 
     model=nn.Linear(9,1)
@@ -155,11 +184,12 @@ if __name__=="__main__":
     X = torch.as_tensor(tttIn).float()
     y = torch.as_tensor(tttOut).float()
     combine=simpleDataset(X,y)
-    loader= data.DataLoader(combine, batch_size=100, shuffle=True, num_workers=0)
+    loader= FastDataLoader(combine, batch_size=100, shuffle=True, num_workers=2)
 
     for i in range(100):
+        print("\n", i, "newepoch\n")
+
         for j, batch_data in enumerate(loader, 0):
-            print("\n", i, "newepoch\n")
 
             optimizer.zero_grad()
             # https://towardsdatascience.com/understanding-pytorch-with-an-example-a-step-by-step-tutorial-81fc5f8c4e8e
@@ -185,3 +215,4 @@ if __name__=="__main__":
         # loss
         loss = lossFunc(input=predict.squeeze(), target=y)
         ######
+    print (loss.item())
