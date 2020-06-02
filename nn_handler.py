@@ -63,18 +63,18 @@ OPTIMIZERS = {
 class NNHandler:
     # TODO: add return information (history, epochs...)
     model: nn.Module
-    lossFunc: nn.Module
+    loss_func: nn.Module
     optimizer: optim
     lr: float
     epochs: int
 
     # There's also self.correctness
-    def __init__(self, sets_of_data, batch_size, model, optimizer, lr, lossFunc=nn.MSELoss(), correctness=lambda x, y: x == y):
+    def __init__(self, sets_of_data, batch_size, model, loss_func, optimizer, lr, correctness=lambda x, y: x == y):
         self.verbose: bool = False
         self.histories = [[], []]
         self.loaders = []
         self.load_data(sets_of_data, batch_size)
-        self.load_model(model, optimizer, lr, lossFunc)
+        self.load_model(model, optimizer, lr, loss_func)
         self.load_correctness(correctness)
 
     def print_alt(self, *args):
@@ -91,7 +91,7 @@ class NNHandler:
         for i in range(len(sets_of_data)):
             self.loaders.append(FastDataLoader(sets_of_data[i], batch_size=batch_size[i], shuffle=True, num_workers=2))
 
-    def custom_init_model(self,model, optimizer, lr, lossFunc):
+    def custom_init_model(self,model, loss_func, optimizer, lr):
         self.model=nn.Sequential()
         in_size=model[0]
         depth=1
@@ -102,19 +102,19 @@ class NNHandler:
             else:
                 self.model.add_module("{}: {}".format(depth, i),ACTIVATIONS[i]())
             depth+=1
-        self.lossFunc=LOSSES[lossFunc]()
+        self.loss_func=LOSSES[loss_func]()
         self.optimizer=OPTIMIZERS[optimizer](self.model.parameters(), lr)
         self.lr=lr
-    def load_model(self, model, optimizer, lr, lossFunc=nn.MSELoss(), use_string=False):
+    def load_model(self, model, loss_func,optimizer, lr, use_string=False):
         ######
         # 4.4 YOUR CODE HERE
         if use_string:
-            self.custom_init_model(model, optimizer, lr, lossFunc)
+            self.custom_init_model(model, loss_func, optimizer, lr)
         else:
             self.model = model
             self.optimizer = optimizer
             self.lr = lr
-            self.lossFunc = lossFunc
+            self.loss_func = loss_func
 
         ######
 
@@ -132,7 +132,7 @@ class NNHandler:
 
         acc = float(sum(self.correctness(predict, y).float())) / len(y)
         # loss
-        loss = self.lossFunc(input=predict.squeeze(), target=y)
+        loss = self.loss_func(input=predict.squeeze(), target=y)
         ######
         return [loss.item(), acc]
 
@@ -160,7 +160,7 @@ class NNHandler:
                 y = y.float()
                 predict = self.model(X)  # squeeze and relu reduce # of channel
                 # print (predict.data)
-                loss = self.lossFunc(input=predict.squeeze(), target=y)
+                loss = self.loss_func(input=predict.squeeze(), target=y)
 
                 loss.backward()  # compute the gradients of the weights
 
@@ -214,10 +214,11 @@ if __name__ == "__main__":
     model = nn.Linear(9, 1)
     lr = 0.1
     optimizer = optim.SGD(model.parameters(), lr)
-
+    loss_func=nn.MSELoss()
     correctness=lambda x, y: torch.eq(torch.argmin((x - possibleRes).abs(), dim=1).float(), y)
-    myNNHandler = NNHandler([tttData], [len(tttData)],model,optimizer,lr,correctness=correctness)
-    myNNHandler.load_model([9,1],'SGD',lr,'MSE', use_string=True)
+    myNNHandler = NNHandler([tttData], [len(tttData)],model, loss_func, optimizer,lr,correctness=correctness)
+    myNNHandler.load_model([9,1],'MSE','SGD',lr, use_string=True)
+
     myNNHandler.train(60, printVerbose=True, graphVerbose=True)
 
     print(myNNHandler.eval_losses_accs(0))
