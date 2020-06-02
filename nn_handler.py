@@ -59,14 +59,27 @@ class NNHandler:
     epochs: int
 
     # There's also self.correctness
-    def __init__(self):
+    def __init__(self, sets_of_data, batch_size, model, optimizer, lr, lossFunc=nn.MSELoss(), correctness=lambda x, y: x == y):
         self.verbose: bool = False
         self.histories = [[], []]
         self.loaders = []
+        self.load_data(sets_of_data, batch_size)
+        self.load_model(model, optimizer, lr, lossFunc)
+        self.load_correctness(correctness)
 
     def print_alt(self, *args):
         if self.verbose == True:
             print(*args)
+
+    def load_data(self, sets_of_data, batch_size):
+        # TODO: GPU mem pin
+        """
+        :param batch_size: iterable of sizes
+        :param sets_of_data: iterable of data.Datasets
+        :return:
+        """
+        for i in range(len(sets_of_data)):
+            self.loaders.append(FastDataLoader(sets_of_data[i], batch_size=batch_size[i], shuffle=True, num_workers=2))
 
     def load_model(self, model, optimizer, lr, lossFunc=nn.MSELoss()):
         ######
@@ -76,16 +89,6 @@ class NNHandler:
         self.lossFunc = lossFunc
         self.lr = lr
         ######
-
-    def load_data(self, sets_of_data, batch_size):
-        # TODO: GPU mem pin
-        """
-        :param batch_size: iterable of sizes
-        :param sets_of_data: iterable of datasets
-        :return:
-        """
-        for i in range(len(sets_of_data)):
-            self.loaders.append(FastDataLoader(sets_of_data[i], batch_size=batch_size[i], shuffle=True, num_workers=2))
 
     def load_correctness(self, correctness=lambda x, y: x == y):
         self.correctness = correctness
@@ -98,8 +101,9 @@ class NNHandler:
 
         # accuracy
         predict = self.model(X)
-        acc = float(sum(self.correctness(predict, y).float())) / len(y)
+        print(self.correctness(predict, y).float())
 
+        acc = float(sum(self.correctness(predict, y).float())) / len(y)
         # loss
         loss = self.lossFunc(input=predict.squeeze(), target=y)
         ######
@@ -172,10 +176,8 @@ class NNHandler:
 
 
 if __name__ == "__main__":
-    myNNHandler = NNHandler()
     possibleRes = torch.as_tensor(np.array([0, 1])).float()
 
-    myNNHandler.load_correctness(lambda x, y: torch.eq(torch.argmin((x - possibleRes).abs(), dim=1).float(), y))
     tttIn = np.random.randint(0, 2, [100, 9])
     tttOut = np.array(
         [(tttIn[i, 0] and tttIn[i, 4] and tttIn[i, 8]) or (tttIn[i, 2] and tttIn[i, 4] and tttIn[i, 6]) for i in
@@ -184,10 +186,11 @@ if __name__ == "__main__":
 
     model = nn.Linear(9, 1)
     lr = 0.1
-
     optimizer = optim.SGD(model.parameters(), lr)
-    myNNHandler.load_model(model, optimizer, lr)
-    myNNHandler.load_data([tttData], [len(tttData)])
+
+    correctness=lambda x, y: torch.eq(torch.argmin((x - possibleRes).abs(), dim=1).float(), y)
+    myNNHandler = NNHandler([tttData], [len(tttData)],model,optimizer,lr,correctness)
+
     print(myNNHandler.eval_losses_accs(0))
 
     myNNHandler.train(60, printVerbose=True, graphVerbose=True)
