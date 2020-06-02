@@ -101,7 +101,6 @@ class NNHandler:
 
         # accuracy
         predict = self.model(X)
-        print(self.correctness(predict, y).float())
 
         acc = float(sum(self.correctness(predict, y).float())) / len(y)
         # loss
@@ -189,8 +188,8 @@ if __name__ == "__main__":
     optimizer = optim.SGD(model.parameters(), lr)
 
     correctness=lambda x, y: torch.eq(torch.argmin((x - possibleRes).abs(), dim=1).float(), y)
-    myNNHandler = NNHandler([tttData], [len(tttData)],model,optimizer,lr,correctness)
+    myNNHandler = NNHandler([tttData], [len(tttData)],model,optimizer,lr,correctness=correctness)
+    myNNHandler.train(60, printVerbose=True, graphVerbose=True)
 
     print(myNNHandler.eval_losses_accs(0))
 
-    myNNHandler.train(60, printVerbose=True, graphVerbose=True)
