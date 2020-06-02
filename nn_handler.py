@@ -35,6 +35,8 @@ class FastDataLoader(data.dataloader.DataLoader):
     def __iter__(self):
         for i in range(len(self)):
             yield next(self.iterator)
+    def add_data(self, new_data):
+        self.dataset=data.dataset.ConcatDataset([self.dataset,new_data])
 
 class SimpleDataset(data.Dataset):
     def __init__(self, X, y):
@@ -90,7 +92,8 @@ class NNHandler:
         """
         for i in range(len(sets_of_data)):
             self.loaders.append(FastDataLoader(sets_of_data[i], batch_size=batch_size[i], shuffle=True, num_workers=2))
-
+    def add_data(self, data, dataset_ind):
+        self.loaders[dataset_ind].add_data(data)
     def custom_init_model(self,model, loss_func, optimizer, lr):
         self.model=nn.Sequential()
         in_size=model[0]
@@ -218,6 +221,7 @@ if __name__ == "__main__":
     correctness=lambda x, y: torch.eq(torch.argmin((x - possibleRes).abs(), dim=1).float(), y)
     myNNHandler = NNHandler([tttData], [len(tttData)],model, loss_func, optimizer,lr,correctness=correctness)
     myNNHandler.load_model([9,1],'MSE','SGD',lr, use_string=True)
+    myNNHandler.add_data(tttData, 0)
 
     myNNHandler.train(60, printVerbose=True, graphVerbose=True)
 
