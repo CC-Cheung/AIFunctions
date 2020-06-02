@@ -22,7 +22,6 @@ class _RepeatSampler(object):
         while True:
             yield from iter(self.sampler)
 
-
 class FastDataLoader(data.dataloader.DataLoader):
 
     def __init__(self, *args, **kwargs):
@@ -37,7 +36,6 @@ class FastDataLoader(data.dataloader.DataLoader):
         for i in range(len(self)):
             yield next(self.iterator)
 
-
 class SimpleDataset(data.Dataset):
     def __init__(self, X, y):
         self.X = X
@@ -50,7 +48,6 @@ class SimpleDataset(data.Dataset):
         return self.X[index], self.y[index]
 
 
-possibleRes = torch.as_tensor(np.array([0, 1])).float()
 
 
 class NNHandler:
