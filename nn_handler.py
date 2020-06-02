@@ -46,7 +46,17 @@ class SimpleDataset(data.Dataset):
 
     def __getitem__(self, index):
         return self.X[index], self.y[index]
-
+ACTIVATIONS = {
+  "r": nn.ReLU,
+  "l": nn.LogSigmoid,
+  "s": nn.LogSoftmax
+}
+LOSSES = {
+  "MSE": nn.MSELoss
+}
+OPTIMIZERS = {
+  "SGD": optim.SGD
+}
 
 
 
@@ -81,13 +91,31 @@ class NNHandler:
         for i in range(len(sets_of_data)):
             self.loaders.append(FastDataLoader(sets_of_data[i], batch_size=batch_size[i], shuffle=True, num_workers=2))
 
-    def load_model(self, model, optimizer, lr, lossFunc=nn.MSELoss()):
+    def custom_init_model(self,model, optimizer, lr, lossFunc):
+        self.model=nn.Sequential()
+        in_size=model[0]
+        depth=1
+        for i in model[1:]:
+            if type(i) is int:
+                self.model.add_module("{}: linear {},{}".format(depth, in_size,i), nn.Linear(in_size, i))
+                in_size = i
+            else:
+                self.model.add_module("{}: {}".format(depth, i),ACTIVATIONS[i]())
+            depth+=1
+        self.lossFunc=LOSSES[lossFunc]()
+        self.optimizer=OPTIMIZERS[optimizer](self.model.parameters(), lr)
+        self.lr=lr
+    def load_model(self, model, optimizer, lr, lossFunc=nn.MSELoss(), use_string=False):
         ######
         # 4.4 YOUR CODE HERE
-        self.model = model
-        self.optimizer = optimizer
-        self.lossFunc = lossFunc
-        self.lr = lr
+        if use_string:
+            self.custom_init_model(model, optimizer, lr, lossFunc)
+        else:
+            self.model = model
+            self.optimizer = optimizer
+            self.lr = lr
+            self.lossFunc = lossFunc
+
         ######
 
     def load_correctness(self, correctness=lambda x, y: x == y):
@@ -189,6 +217,7 @@ if __name__ == "__main__":
 
     correctness=lambda x, y: torch.eq(torch.argmin((x - possibleRes).abs(), dim=1).float(), y)
     myNNHandler = NNHandler([tttData], [len(tttData)],model,optimizer,lr,correctness=correctness)
+    myNNHandler.load_model([9,1],'SGD',lr,'MSE', use_string=True)
     myNNHandler.train(60, printVerbose=True, graphVerbose=True)
 
     print(myNNHandler.eval_losses_accs(0))

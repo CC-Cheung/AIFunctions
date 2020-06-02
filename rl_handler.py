@@ -1,5 +1,9 @@
 from nn_handler import NNHandler
-
+def accumMult(a):
+    total=1
+    for i in a:
+        total*=i
+    return total
 class DQN:
     def __init__(self, observation_space, action_space, MLPDesc, batchSize=64, gamma=0.995,lr=0.007, maxMemSize=10000):
         self.batchSize=batchSize
