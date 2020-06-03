@@ -71,7 +71,7 @@ class NNHandler:
     def complete_init(cls, sets_of_data, batch_size, model, loss_func, optimizer, lr, correctness=lambda x, y: x == y):
         myNNHandler=cls()
         myNNHandler.load_data(sets_of_data, batch_size)
-        myNNHandler.load_model(model, optimizer, lr, loss_func)
+        myNNHandler.load_model(model, loss_func, optimizer, lr)
         myNNHandler.load_correctness(correctness)
         return myNNHandler
 
@@ -90,32 +90,35 @@ class NNHandler:
         """
         for i in range(len(sets_of_data)):
             self.loaders.append(FastDataLoader(sets_of_data[i], batch_size=batch_size[i], shuffle=True, num_workers=2))
-    def add_data(self, data, dataset_ind):
-        self.loaders[dataset_ind].add_data(data)
-    def custom_init_model(self,model, loss_func, optimizer, lr):
+    # def add_data(self, data, dataset_ind):
+    #     self.loaders[dataset_ind].add_data(data)
+    def custom_load_model(self,descriptor):
+        """
+
+        :param descriptor: [model stuff, loss_func, optimizer, lr]
+        :return:
+        """
         self.model=nn.Sequential()
-        in_size=model[0]
+        in_size=descriptor[0]
         depth=1
-        for i in model[1:]:
+        for i in descriptor[1:-3]:
             if type(i) is int:
                 self.model.add_module("{}: linear {},{}".format(depth, in_size,i), nn.Linear(in_size, i))
                 in_size = i
             else:
                 self.model.add_module("{}: {}".format(depth, i),ACTIVATIONS[i]())
             depth+=1
-        self.loss_func=LOSSES[loss_func]()
-        self.optimizer=OPTIMIZERS[optimizer](self.model.parameters(), lr)
-        self.lr=lr
+        self.loss_func=LOSSES[descriptor[-3]]()
+        self.lr = descriptor[-1]
+        self.optimizer=OPTIMIZERS[descriptor[-2]](self.model.parameters(), self.lr)
+
     def load_model(self, model, loss_func,optimizer, lr, use_string=False):
         ######
-        # 4.4 YOUR CODE HERE
-        if use_string:
-            self.custom_init_model(model, loss_func, optimizer, lr)
-        else:
-            self.model = model
-            self.optimizer = optimizer
-            self.lr = lr
-            self.loss_func = loss_func
+
+        self.model = model
+        self.optimizer = optimizer
+        self.lr = lr
+        self.loss_func = loss_func
 
         ######
 
@@ -221,7 +224,7 @@ if __name__ == "__main__":
     correctness=lambda x, y: torch.eq(torch.argmin((x - possibleRes).abs(), dim=1).float(), y)
     myNNHandler = NNHandler.complete_init([tttData], [len(tttData)],model, loss_func, optimizer,lr,correctness=correctness)
     # myNNHandler.add_data(tttData, 0)
-
+    myNNHandler.custom_load_model([9,1,'MSE','SGD',0.1])
     myNNHandler.train(60, printVerbose=True, graphVerbose=True)
 
     print(myNNHandler.eval_losses_accs(0))
