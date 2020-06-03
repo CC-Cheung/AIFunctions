@@ -4,6 +4,7 @@ def accumMult(a):
     for i in a:
         total*=i
     return total
+#TODO: Add memory (tensor state, reward, next, number for action), Add adding obs, override load data with take from memory, override train
 class DQNHandler(NNHandler):
     def __init__(self, observation_space, action_space, MLPDesc, batchSize=64, gamma=0.995,lr=0.007, maxMemSize=10000):
         super().__init__()

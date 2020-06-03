@@ -36,8 +36,9 @@ class FastDataLoader(data.dataloader.DataLoader):
         for i in range(len(self)):
             yield next(self.iterator)
     def add_data(self, new_data):
+        print(self.dataset)
         self.dataset=data.dataset.ConcatDataset([self.dataset,new_data])
-
+        print(self.dataset)
 class SimpleDataset(data.Dataset):
     def __init__(self, X, y):
         self.X = X
@@ -215,6 +216,8 @@ if __name__ == "__main__":
     tttData = SimpleDataset(tttIn, tttOut)
 
     model = nn.Linear(9, 1)
+    print(model(torch.from_numpy(np.array([i for i in range(9)])).float()))
+
     lr = 0.1
     optimizer = optim.SGD(model.parameters(), lr)
     loss_func=nn.MSELoss()
@@ -223,7 +226,7 @@ if __name__ == "__main__":
     myNNHandler.load_model([9,1],'MSE','SGD',lr, use_string=True)
     myNNHandler.add_data(tttData, 0)
 
-    myNNHandler.train(60, printVerbose=True, graphVerbose=True)
+    # myNNHandler.train(60, printVerbose=True, graphVerbose=True)
 
     print(myNNHandler.eval_losses_accs(0))
 
