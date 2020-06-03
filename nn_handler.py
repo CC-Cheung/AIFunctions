@@ -39,16 +39,7 @@ class FastDataLoader(data.dataloader.DataLoader):
         print(self.dataset)
         self.dataset=data.dataset.ConcatDataset([self.dataset,new_data])
         print(self.dataset)
-class SimpleDataset(data.Dataset):
-    def __init__(self, X, y):
-        self.X = X
-        self.y = y
 
-    def __len__(self):
-        return len(self.y)
-
-    def __getitem__(self, index):
-        return self.X[index], self.y[index]
 ACTIVATIONS = {
   "r": nn.ReLU,
   "l": nn.LogSigmoid,
@@ -72,13 +63,19 @@ class NNHandler:
     epochs: int
 
     # There's also self.correctness
-    def __init__(self, sets_of_data, batch_size, model, loss_func, optimizer, lr, correctness=lambda x, y: x == y):
+    def __init__(self):
         self.verbose: bool = False
         self.histories = [[], []]
         self.loaders = []
-        self.load_data(sets_of_data, batch_size)
-        self.load_model(model, optimizer, lr, loss_func)
-        self.load_correctness(correctness)
+    @classmethod
+    def complete_init(cls, sets_of_data, batch_size, model, loss_func, optimizer, lr, correctness=lambda x, y: x == y):
+        myNNHandler=cls()
+        myNNHandler.load_data(sets_of_data, batch_size)
+        myNNHandler.load_model(model, optimizer, lr, loss_func)
+        myNNHandler.load_correctness(correctness)
+        return myNNHandler
+
+
 
     def print_alt(self, *args):
         if self.verbose == True:
@@ -213,7 +210,7 @@ if __name__ == "__main__":
     tttOut = np.array(
         [(tttIn[i, 0] and tttIn[i, 4] and tttIn[i, 8]) or (tttIn[i, 2] and tttIn[i, 4] and tttIn[i, 6]) for i in
          range(100)])
-    tttData = SimpleDataset(tttIn, tttOut)
+    tttData = data.TensorDataset(torch.as_tensor(tttIn), torch.as_tensor(tttOut))
 
     model = nn.Linear(9, 1)
     print(model(torch.from_numpy(np.array([i for i in range(9)])).float()))
@@ -222,11 +219,10 @@ if __name__ == "__main__":
     optimizer = optim.SGD(model.parameters(), lr)
     loss_func=nn.MSELoss()
     correctness=lambda x, y: torch.eq(torch.argmin((x - possibleRes).abs(), dim=1).float(), y)
-    myNNHandler = NNHandler([tttData], [len(tttData)],model, loss_func, optimizer,lr,correctness=correctness)
-    myNNHandler.load_model([9,1],'MSE','SGD',lr, use_string=True)
-    myNNHandler.add_data(tttData, 0)
+    myNNHandler = NNHandler.complete_init([tttData], [len(tttData)],model, loss_func, optimizer,lr,correctness=correctness)
+    # myNNHandler.add_data(tttData, 0)
 
-    # myNNHandler.train(60, printVerbose=True, graphVerbose=True)
+    myNNHandler.train(60, printVerbose=True, graphVerbose=True)
 
     print(myNNHandler.eval_losses_accs(0))
 
