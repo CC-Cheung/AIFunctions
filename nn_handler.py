@@ -1,10 +1,10 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import torch
 
 import torch.utils.data as data
 import torch.nn as nn
 import torch.optim as optim
-import torch
 
 
 # from https://github.com/pytorch/pytorch/issues/15849
@@ -125,7 +125,7 @@ class NNHandler:
     def load_correctness(self, correctness=lambda x, y: x == y):
         self.correctness = correctness
 
-    def eval_losses_accs(self, ind):
+    def eval_losses_accs(self, ind): #requires correctness
         X, y = next(iter(self.loaders[ind]))
         X = X.float()
         y = y.float()
