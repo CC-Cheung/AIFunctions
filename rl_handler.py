@@ -3,7 +3,7 @@ import torch.utils.data as data
 import torch
 import numpy as np
 import gym
-import matplotlib as plt
+import matplotlib.pyplot as plt
 SUCCESS_REWARD = 195
 SUCCESS_STREAK = 100
 MAX_EPISODES = 200
@@ -42,7 +42,7 @@ class DynamicTDS(data.TensorDataset):  # stands for Dynamic TensorDataset
 # TODO: Add memory (tensor state, reward, next, number for action), Add adding obs, override load data with take from memory, override train
 class DQNHandler(NNHandler):
     def __init__(self, observation_space, action_space, MLPDesc, batchSize=64, gamma=0.995, max_mem=10000,
-                 expl_decay=0.99, expl_min=0.1):
+                 expl_decay=0.993, expl_min=0.1):
         super().__init__()
         self.custom_load_model(MLPDesc)
         self.load_correctness(lambda x, y: abs(x - y))
@@ -111,26 +111,26 @@ class DQNHandler(NNHandler):
 
         if new_args[4]:
             if new_args[5] > 500:
-                new_args[3] *= -5
+                new_args[2] *= -5
             else:
-                new_args[3] *= 5
+                new_args[2] *= 5
         if new_args[5]==0:
             self.expl_rate*=self.expl_decay
 
         self.loaders[0].dataset.add_data(*(new_args[:5]))
 
-        # if torch.rand(1) > 0.25:
-        #     return -1
+        if np.random.rand() > 0.25:
+            return -1
 
         self.curLoss = self.train(new_args[5])
         return self.curLoss
 
     def action(self, state):
-        if torch.rand(1)> max(self.expl_rate, self.expl_min):
+        if np.random.rand()> max(self.expl_rate, self.expl_min):
             with torch.no_grad():
                 return self.model(torch.as_tensor(state).unsqueeze(0).float()).detach().max(1)[1].numpy()[0]
         else:
-            return 0#TODO: change
+            return np.random.randint(0,2)
 
 
 def run_cart_pole():
@@ -145,20 +145,20 @@ def run_cart_pole():
     env._max_episode_steps = MAX_STEPS
 
     # Create an instance of the agent.
-    cp_agent = DQNHandler(env.observation_space, env.action_space, [4, 10, 10, 2, 'MSE', 'SGD', 0.01])
+    cp_agent = DQNHandler(env.observation_space, env.action_space, [4, 8, 'sig', 8,'r', 2, 'MSE', 'SGD', 0.1])
     avg_reward, win_streak = (0, 0)
     rewards = []
     losses = []
     exp = []
     exit = False
     count = 0
-    for episode in range(1500):
+    for episode in range(600):
         state = env.reset()
 
         # Reset the agent, if desired.
         cp_agent.reset()
         episode_reward = 0
-        exp.append(cp_agent.expl_rate)
+        exp.append(max(cp_agent.expl_rate, cp_agent.expl_min))
         print(count)
 
         # The total number of steps is limited (to avoid long-running loops).
@@ -181,10 +181,9 @@ def run_cart_pole():
             # Update any information inside the agent, if desired.
 
             losses.append(cp_agent.update(state, action, reward, state_next, terminal,steps))
-            print(losses[-1], len(cp_agent.loaders[0].dataset))
             if losses[-1] > 1000000:
                 print("high")
-                # exit=True
+                exit=True
                 break
 
             episode_reward += reward  # Total reward for this episode.
@@ -213,6 +212,7 @@ def run_cart_pole():
                 else:
                     win_streak = 0
                 break
+        print(losses[-1])
 
         if exit:
             break

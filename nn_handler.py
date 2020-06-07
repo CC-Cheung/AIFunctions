@@ -42,8 +42,8 @@ class FastDataLoader(data.dataloader.DataLoader):
 
 ACTIVATIONS = {
   "r": nn.ReLU,
-  "l": nn.LogSigmoid,
-  "s": nn.LogSoftmax
+  "sig": nn.Sigmoid,
+  "sof": nn.Softmax
 }
 LOSSES = {
   "MSE": nn.MSELoss
