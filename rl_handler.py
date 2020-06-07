@@ -1,9 +1,9 @@
 from nn_handler import NNHandler, FastDataLoader
 import torch.utils.data as data
-
 import torch
+import numpy as np
 import gym
-
+import matplotlib as plt
 SUCCESS_REWARD = 195
 SUCCESS_STREAK = 100
 MAX_EPISODES = 200
@@ -20,20 +20,23 @@ def accumMult(a):
 
 class DynamicTDS(data.TensorDataset):  # stands for Dynamic TensorDataset
     def __init__(self, max_mem):
-
         self.empty = True
         self.max_mem = max_mem
-
+    def __len__(self):
+        if self.empty:
+            return 1 #Fake
+        else:
+            return self.tensors[0].size(0)
     def add_data(self, *tensors):
         assert all(tensors[0].size(0) == tensor.size(0) for tensor in tensors)
 
         if self.empty:
             self.empty = False
-            self.tensors = tensors
+            self.tensors = list(tensors)
+            return
         assert len(tensors) == len(self.tensors)
-        assert all(self.tensors[i].size(1) == tensors[i].size(1) for i in range(len(tensors)))
-        for i in len(tensors):
-            self.tensors[i] = torch.cat((self.tensors[i], i), 0)
+        for i in range(len(tensors)):
+            self.tensors[i] = torch.cat((self.tensors[i], tensors[i]), 0)
 
 
 # TODO: Add memory (tensor state, reward, next, number for action), Add adding obs, override load data with take from memory, override train
@@ -60,27 +63,51 @@ class DQNHandler(NNHandler):
         self.load_data([DynamicTDS(max_mem)], [batchSize])
         self.stop = False
 
-    def train(self, num_step):
+    def load_data(self, sets_of_data, batch_size):
+        # TODO: Change it to 1 loader
+        """
+        :param batch_size: iterable of sizes
+        :param sets_of_data: iterable of data.Datasets
+        :return:
+        """
+        for i in range(len(sets_of_data)):
+            self.loaders.append(FastDataLoader(sets_of_data[i], batch_size=batch_size[i], shuffle=True)) #TODO: removed workers
 
+    def train(self, num_step):
+        if len(self.loaders[0].dataset)<self.batchSize:
+            return -1
         states, actions, rewards, next_states, terminals = next(
             iter(self.loaders[0]))  # TODO: add more efficient method
 
-        with torch.no_grad():
-            labels_next = self.model(next_states).detach().max(1)[0].unsqueeze(1)
+        # with torch.no_grad():
+        #     labels_next = self.model(next_states).detach().max(1)[0].unsqueeze(1)
+        #
+        # labels = rewards + (self.gamma * labels_next * (1 - terminals))
+        labels=self.model(states)
+        mask=self.model(next_states).detach().max(1) #0=val, 1=index
+        for i in range(labels.shape[0]):
+            labels[i, mask[1]]= rewards[i]+self.gamma*mask[0]*(1-terminals[i])
 
-        labels = rewards + (self.gamma * labels_next * (1 - terminals))
+        # if self.stop:
+        #     return -1
 
-        if self.stop:
-            return -1
-        self.curLoss = self.model.train(states, labels)
+        self.optimizer.zero_grad()
+
+        predict = self.model(states)  # squeeze and relu reduce # of channel
+        # print (predict.data)
+        loss = self.loss_func(input=predict, target=labels)
+        loss.backward()  # compute the gradients of the weights
+        self.optimizer.step()  # this changes the weights and the bias using the learningrate and gradients
+        return loss.data
 
     def predict(self, state):
         return self.model(state)
-
+    def reset(self):
+        pass
     def update(self, *args):
         # state, action, reward, nextState, terminal, numStep
 
-        new_args = [torch.as_tensor(args).unsqueeze(0) for i in range(len(args))]
+        new_args = [torch.as_tensor(args[i]).unsqueeze(0).float() for i in range(len(args))]
 
         if new_args[4]:
             if new_args[5] > 500:
@@ -92,16 +119,16 @@ class DQNHandler(NNHandler):
 
         self.loaders[0].dataset.add_data(*(new_args[:5]))
 
-        if self.memEnd < self.batchSize or torch.rand(1) > 0.25:
-            return -1
+        # if torch.rand(1) > 0.25:
+        #     return -1
 
         self.curLoss = self.train(new_args[5])
         return self.curLoss
 
     def action(self, state):
-        if torch.rand(1)> max(self.expl_rate, self.expl_min)
+        if torch.rand(1)> max(self.expl_rate, self.expl_min):
             with torch.no_grad():
-                return self.model(torch.as_tensor(state).unsqueeze(0)).detach().max(1)[0].data[0]
+                return self.model(torch.as_tensor(state).unsqueeze(0).float()).detach().max(1)[1].numpy()[0]
         else:
             return 0#TODO: change
 
@@ -131,7 +158,7 @@ def run_cart_pole():
         # Reset the agent, if desired.
         cp_agent.reset()
         episode_reward = 0
-        exp.append(cp_agent.explRate)
+        exp.append(cp_agent.expl_rate)
         print(count)
 
         # The total number of steps is limited (to avoid long-running loops).
@@ -153,8 +180,8 @@ def run_cart_pole():
 
             # Update any information inside the agent, if desired.
 
-            losses.append(cp_agent.update(state, action, reward, state_next, terminal))
-            # print(losses[-1])
+            losses.append(cp_agent.update(state, action, reward, state_next, terminal,steps))
+            print(losses[-1], len(cp_agent.loaders[0].dataset))
             if losses[-1] > 1000000:
                 print("high")
                 # exit=True
@@ -194,7 +221,6 @@ def run_cart_pole():
         # Has the agent succeeded?
         if win_streak == SUCCESS_STREAK and avg_reward >= SUCCESS_REWARD:
             return episode + 1, avg_reward
-        print(losses[-1])
 
     fig, ax = plt.subplots()
     ax.plot(losses)
