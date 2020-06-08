@@ -93,8 +93,8 @@ class DQNHandler(NNHandler):
         #     return -1
 
         self.optimizer.zero_grad()
-        utils.clip_grad_norm_(self.model.parameters(), 2)
-        utils.clip_grad_value_(self.model.parameters(),1)
+        utils.clip_grad_norm_(self.model.parameters(),3)
+        # utils.clip_grad_value_(self.model.parameters(),1)
         predict = self.model(states)  # squeeze and relu reduce # of channel
         # print (predict.data)
         loss = self.loss_func(input=predict, target=labels)
@@ -147,7 +147,7 @@ def run_cart_pole():
     env._max_episode_steps = MAX_STEPS
 
     # Create an instance of the agent.
-    cp_agent = DQNHandler(env.observation_space, env.action_space, [4, 8, 'sig', 8,'r', 2, 'MSE', 'SGD', 0.01])
+    cp_agent = DQNHandler(env.observation_space, env.action_space, [4, 8, 'sig', 8,'sig', 2, 'MSE', 'SGD', 0.05])
     avg_reward, win_streak = (0, 0)
     rewards = []
     losses = []
