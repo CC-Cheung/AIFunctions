@@ -1,6 +1,8 @@
 from nn_handler import NNHandler, FastDataLoader
 import torch.utils.data as data
+
 import torch
+import torch.nn.utils as utils
 import numpy as np
 import gym
 import matplotlib.pyplot as plt
@@ -73,9 +75,8 @@ class DQNHandler(NNHandler):
         for i in range(len(sets_of_data)):
             self.loaders.append(FastDataLoader(sets_of_data[i], batch_size=batch_size[i], shuffle=True)) #TODO: removed workers
 
-    def train(self, num_step):
-        if len(self.loaders[0].dataset)<self.batchSize:
-            return -1
+    def train(self, num_step):#TODO: use num_step?
+
         states, actions, rewards, next_states, terminals = next(
             iter(self.loaders[0]))  # TODO: add more efficient method
 
@@ -84,15 +85,16 @@ class DQNHandler(NNHandler):
         #
         # labels = rewards + (self.gamma * labels_next * (1 - terminals))
         labels=self.model(states)
-        mask=self.model(next_states).detach().max(1) #0=val, 1=index
+        max_next=self.model(next_states).detach().max(1)[0] #0=val, 1=index
         for i in range(labels.shape[0]):
-            labels[i, mask[1]]= rewards[i]+self.gamma*mask[0]*(1-terminals[i])
+            labels[i, actions[i]]= rewards[i]+self.gamma*max_next[i]*(1-terminals[i])
 
         # if self.stop:
         #     return -1
 
         self.optimizer.zero_grad()
-
+        utils.clip_grad_norm_(self.model.parameters(), 2)
+        utils.clip_grad_value_(self.model.parameters(),1)
         predict = self.model(states)  # squeeze and relu reduce # of channel
         # print (predict.data)
         loss = self.loss_func(input=predict, target=labels)
@@ -108,7 +110,7 @@ class DQNHandler(NNHandler):
         # state, action, reward, nextState, terminal, numStep
 
         new_args = [torch.as_tensor(args[i]).unsqueeze(0).float() for i in range(len(args))]
-
+        new_args[1]=new_args[1].int()
         if new_args[4]:
             if new_args[5] > 500:
                 new_args[2] *= -5
@@ -119,7 +121,7 @@ class DQNHandler(NNHandler):
 
         self.loaders[0].dataset.add_data(*(new_args[:5]))
 
-        if np.random.rand() > 0.25:
+        if np.random.rand() > 0.25 or len(self.loaders[0].dataset)<self.batchSize:
             return -1
 
         self.curLoss = self.train(new_args[5])
@@ -145,14 +147,14 @@ def run_cart_pole():
     env._max_episode_steps = MAX_STEPS
 
     # Create an instance of the agent.
-    cp_agent = DQNHandler(env.observation_space, env.action_space, [4, 8, 'sig', 8,'r', 2, 'MSE', 'SGD', 0.1])
+    cp_agent = DQNHandler(env.observation_space, env.action_space, [4, 8, 'sig', 8,'r', 2, 'MSE', 'SGD', 0.01])
     avg_reward, win_streak = (0, 0)
     rewards = []
     losses = []
     exp = []
     exit = False
     count = 0
-    for episode in range(600):
+    for episode in range(1000):
         state = env.reset()
 
         # Reset the agent, if desired.
@@ -183,8 +185,8 @@ def run_cart_pole():
             losses.append(cp_agent.update(state, action, reward, state_next, terminal,steps))
             if losses[-1] > 1000000:
                 print("high")
-                exit=True
-                break
+                # exit=True
+                # break
 
             episode_reward += reward  # Total reward for this episode.
             state = state_next

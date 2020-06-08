@@ -140,18 +140,18 @@ class NNHandler:
         ######
         return [loss.item(), acc]
 
-    def train(self, epochs, trainInd=0, evalInd=None, printVerbose=False, graphVerbose=False, graphRate=10):
+    def train(self, epochs, trainInd=0, evalInd=None, print_verbose=False, graph_verbose=False, clip_grad=False, graphRate=10):
         # TODO:evalInd to have test data too (maybe)
         """
 
         :param epochs:
         :param trainInd: default is first dataloader
         :param evalInd: default is second dataloader
-        :param printVerbose:
+        :param print_verbose:
         :return:
         """
         self.epochs = epochs
-        self.verbose = printVerbose
+        self.verbose = print_verbose
         for i in range(epochs):
             self.print_alt("\n", i, "newepoch\n")
             for j, batch_data in enumerate(self.loaders[trainInd], 0):
@@ -165,7 +165,8 @@ class NNHandler:
                 predict = self.model(X)  # squeeze and relu reduce # of channel
                 # print (predict.data)
                 loss = self.loss_func(input=predict.squeeze(), target=y)
-
+                if clip_grad:
+                    nn.utils.clip_grad_norm_(self.model.parameters(),1)
                 loss.backward()  # compute the gradients of the weights
 
                 self.optimizer.step()  # this changes the weights and the bias using the learningrate and gradients
@@ -180,7 +181,7 @@ class NNHandler:
                 self.histories[1].append(self.eval_losses_accs(evalInd))
                 self.print_alt(self.histories[1][-1])
 
-            if graphVerbose and i % graphRate == 0:
+            if graph_verbose and i % graphRate == 0:
                 t_losses_accs_arr = np.array(self.histories[0])
                 self.print_alt(t_losses_accs_arr.shape)
                 plt.figure()
@@ -225,7 +226,7 @@ if __name__ == "__main__":
     myNNHandler = NNHandler.complete_init([tttData], [len(tttData)],model, loss_func, optimizer,lr,correctness=correctness)
     # myNNHandler.add_data(tttData, 0)
     myNNHandler.custom_load_model([9,1,'MSE','SGD',0.1])
-    myNNHandler.train(60, printVerbose=True, graphVerbose=True)
+    myNNHandler.train(60, print_verbose=True, graph_verbose=True)
 
     print(myNNHandler.eval_losses_accs(0))
 
