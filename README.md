@@ -1,2 +1,5 @@
 # AIFunctions
-General functions used in AI:Training loop, Data Manipulation/cleaning
+(Under construction)
+General functions used in AI:
+  neural network handler (nn_handler.py)
+  reinforcement learning handler(rl_handler.py)
