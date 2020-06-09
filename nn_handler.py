@@ -76,7 +76,6 @@ class NNHandler:
         return myNNHandler
 
 
-
     def print_alt(self, *args):
         if self.verbose == True:
             print(*args)
@@ -94,7 +93,6 @@ class NNHandler:
     #     self.loaders[dataset_ind].add_data(data)
     def custom_load_model(self,descriptor):
         """
-
         :param descriptor: [model stuff, loss_func, optimizer, lr]
         :return:
         """
@@ -205,7 +203,26 @@ class NNHandler:
                 plt.ylabel('Accuracy')
                 plt.show()
                 # TODO: Add maybe time
+    def save_to_file(self, path_name, continue_train=True):
+        if continue_train:
+            state = {
+                'lr': self.lr,
+                'model': self.model.state_dict(),
+                'optimizer': self.optimizer.state_dict(),
 
+            }
+            torch.save(state, path_name)
+        else:
+            torch.save(self.model, path_name)
+    def load_from_file(self, path_name,continue_train=True):
+        if continue_train:
+            state = torch.load(path_name)
+            self.lr=state['lr']
+            self.model.load_state_dict(state['model'])
+            self.optimizer.load_state_dict(state['optimizer'])
+            self.histories = [[], []]
+        else:
+            torch.save(self.model, path_name)
 
 if __name__ == "__main__":
     possibleRes = torch.as_tensor(np.array([0, 1])).float()
@@ -228,5 +245,7 @@ if __name__ == "__main__":
     myNNHandler.custom_load_model([9,1,'MSE','SGD',0.1])
     myNNHandler.train(60, print_verbose=True, graph_verbose=True)
 
-    print(myNNHandler.eval_losses_accs(0))
 
+    myNNHandler.load_from_file('model.pt')
+    print(myNNHandler.eval_losses_accs(0))
+    myNNHandler.train(60, print_verbose=True, graph_verbose=True)
