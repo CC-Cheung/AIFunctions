@@ -42,15 +42,18 @@ class FastDataLoader(data.dataloader.DataLoader):
         print(self.dataset)
 
 ACTIVATIONS = {
-  "r": nn.ReLU,
-  "sig": nn.Sigmoid,
-  "sof": nn.Softmax
+    "r": nn.ReLU,
+    "sig": nn.Sigmoid,
+    "sof": nn.Softmax
 }
 LOSSES = {
-  "MSE": nn.MSELoss
+    "MSE": nn.MSELoss,
+    "CE":nn.CrossEntropyLoss,
+    "BCELog":nn.BCEWithLogitsLoss
 }
 OPTIMIZERS = {
-  "SGD": optim.SGD
+    "SGD": optim.SGD,
+    "ADAM": optim.Adam
 }
 
 
@@ -126,8 +129,7 @@ class NNHandler:
 
     def eval_losses_accs(self, ind): #requires correctness
         X, y = next(iter(self.loaders[ind]))
-        X = X.float()
-        y = y.float()
+
         total_corr = 0
 
         # accuracy
@@ -159,8 +161,7 @@ class NNHandler:
                 y = batch_data[1]
                 self.optimizer.zero_grad()
                 # https://towardsdatascience.com/understanding-pytorch-with-an-example-a-step-by-step-tutorial-81fc5f8c4e8e
-                X = X.float()
-                y = y.float()
+
                 predict = self.model(X)  # squeeze and relu reduce # of channel
                 # print (predict.data)
                 loss = self.loss_func(input=predict.squeeze(), target=y)
@@ -232,9 +233,11 @@ if __name__ == "__main__":
 
     tttIn = np.random.randint(0, 2, [100, 9])
     tttOut = np.array(
-        [(tttIn[i, 0] and tttIn[i, 4] and tttIn[i, 8]) or (tttIn[i, 2] and tttIn[i, 4] and tttIn[i, 6]) for i in
-         range(100)])
-    tttData = data.TensorDataset(torch.as_tensor(tttIn), torch.as_tensor(tttOut))
+        [[(tttIn[i, 0] and tttIn[i, 4] and tttIn[i, 8]) or (tttIn[i, 2] and tttIn[i, 4] and tttIn[i, 6]) for i in
+         range(100)]])
+    tttOutNot=(tttOut+1)%2
+    tttOut=np.concatenate([tttOut,tttOutNot], axis=0).transpose()
+    tttData = data.TensorDataset(torch.as_tensor(tttIn).float(), torch.as_tensor(tttOut).float())
 
     model = nn.Linear(9, 1)
     print(model(torch.from_numpy(np.array([i for i in range(9)])).float()))
@@ -245,7 +248,7 @@ if __name__ == "__main__":
     correctness=lambda x, y: torch.eq(torch.argmin((x - possibleRes).abs(), dim=1).float(), y)
     myNNHandler = NNHandler.complete_init([tttData], [len(tttData)],model, loss_func, optimizer,lr,correctness=correctness)
     # myNNHandler.add_data(tttData, 0)
-    myNNHandler.custom_load_model([9,1,'MSE','SGD',0.1])
+    myNNHandler.custom_load_model([9,5,'r',2,'MSE','ADAM',0.01])
     myNNHandler.train(60, print_verbose=True, graph_verbose=True)
     # myNNHandler.save_to_file('model.pt')
     #
