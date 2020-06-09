@@ -5,6 +5,7 @@ import torch
 import torch.utils.data as data
 import torch.nn as nn
 import torch.optim as optim
+from torchsummary import summary
 
 
 # from https://github.com/pytorch/pytorch/issues/15849
@@ -223,7 +224,9 @@ class NNHandler:
             self.histories = [[], []]
         else:
             torch.save(self.model, path_name)
-
+    def print_model(self):
+        batch_in=next(iter(self.loaders[0]))[0]
+        summary(self.model, batch_in.shape)
 if __name__ == "__main__":
     possibleRes = torch.as_tensor(np.array([0, 1])).float()
 
@@ -244,8 +247,9 @@ if __name__ == "__main__":
     # myNNHandler.add_data(tttData, 0)
     myNNHandler.custom_load_model([9,1,'MSE','SGD',0.1])
     myNNHandler.train(60, print_verbose=True, graph_verbose=True)
-
-
-    myNNHandler.load_from_file('model.pt')
-    print(myNNHandler.eval_losses_accs(0))
-    myNNHandler.train(60, print_verbose=True, graph_verbose=True)
+    # myNNHandler.save_to_file('model.pt')
+    #
+    # myNNHandler.load_from_file('model.pt')
+    # print(myNNHandler.eval_losses_accs(0))
+    # myNNHandler.train(60, print_verbose=True, graph_verbose=True)
+    myNNHandler.print_model()
