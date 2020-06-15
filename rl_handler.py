@@ -3,6 +3,7 @@ import torch.utils.data as data
 
 import torch
 import torch.nn.utils as utils
+import torch.nn as nn
 import numpy as np
 import gym
 import matplotlib.pyplot as plt
@@ -76,7 +77,7 @@ class DQNHandler(NNHandler):
         for i in range(len(sets_of_data)):
             self.loaders.append(FastDataLoader(sets_of_data[i], batch_size=batch_size[i], shuffle=True)) #TODO: removed workers
 
-    def train(self, num_step):#TODO: use num_step?
+    def train(self):
 
         states, actions, rewards, next_states, terminals = next(
             iter(self.loaders[0]))  # TODO: add more efficient method
@@ -122,7 +123,7 @@ class DQNHandler(NNHandler):
         if np.random.rand() > 0.25 or len(self.loaders[0].dataset)<self.batchSize:
             return -1
 
-        self.curLoss = self.train(new_args[5])
+        self.curLoss = self.train()
         return self.curLoss
 
     def action(self, state):
@@ -134,11 +135,17 @@ class DQNHandler(NNHandler):
 
 class DDQNHandler(DQNHandler):
     def __init__(self, observation_space, action_space, MLPDesc, batchSize=64, gamma=0.995, max_mem=10000,
-                 expl_decay=0.993, expl_min=0.1, clip_grad=False):
+                 expl_decay=0.993, expl_min=0.1, clip_grad=False, tau=0.1,target_model_update_rate=10):
         super().__init__(observation_space, action_space, MLPDesc, batchSize=batchSize, gamma=gamma, max_mem=max_mem,
                  expl_decay=expl_decay, expl_min=expl_min, clip_grad=clip_grad)
+        self.tau=tau
         self.target_model=self.custom_load_model(MLPDesc)
-    def train(self,num_step):
+        self.target_model_update_rate=target_model_update_rate
+        self.num_updates=0
+    def update(self, *args):
+        self.num_updates+=1
+        super().update(args)
+    def train(self):
         states, actions, rewards, next_states, terminals = next(
             iter(self.loaders[0]))  # TODO: add more efficient method
 
@@ -164,7 +171,11 @@ class DDQNHandler(DQNHandler):
         loss = self.loss_func(input=predict, target=labels)
         loss.backward()  # compute the gradients of the weights
         self.optimizer.step()  # this changes the weights and the bias using the learningrate and gradients
-        self.target_model.parameters()
+        if self.num_updates % self.target_model_update_rate:
+            #https://github.com/xkiwilabs/DQN-using-PyTorch-and-ML-Agents/blob/master/dqn_agent.py
+            for target_param, local_param in zip(self.target_model.parameters(), self.model.parameters()):
+                target_param.data.copy_(self.tau * local_param.data + (1.0 - self.tau) * target_param.data)
+
 def run_cart_pole():
     """
     Run instances of cart-pole gym and tally scores.
