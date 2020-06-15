@@ -132,7 +132,39 @@ class DQNHandler(NNHandler):
         else:
             return np.random.randint(0,2)
 
+class DDQNHandler(DQNHandler):
+    def __init__(self, observation_space, action_space, MLPDesc, batchSize=64, gamma=0.995, max_mem=10000,
+                 expl_decay=0.993, expl_min=0.1, clip_grad=False):
+        super().__init__(observation_space, action_space, MLPDesc, batchSize=batchSize, gamma=gamma, max_mem=max_mem,
+                 expl_decay=expl_decay, expl_min=expl_min, clip_grad=clip_grad)
+        self.target_model=self.custom_load_model(MLPDesc)
+    def train(self,num_step):
+        states, actions, rewards, next_states, terminals = next(
+            iter(self.loaders[0]))  # TODO: add more efficient method
 
+        # with torch.no_grad():
+        #     labels_next = self.model(next_states).detach().max(1)[0].unsqueeze(1)
+        #
+        # labels = rewards + (self.gamma * labels_next * (1 - terminals))
+        labels = self.model(states)
+        max_next = self.model(next_states).detach().max(1)[1]  # 0=val, 1=index
+        max_next= self.target_model(next_states)[max_next]
+        for i in range(labels.shape[0]):
+            labels[i, actions[i]] = rewards[i] + self.gamma * max_next[i] * (1 - terminals[i])
+
+        # if self.stop:
+        #     return -1
+
+        self.optimizer.zero_grad()
+        if self.clip_grad:
+            utils.clip_grad_norm_(self.model.parameters(), self.clip_grad)
+        # utils.clip_grad_value_(self.model.parameters(),1)
+        predict = self.model(states)  # squeeze and relu reduce # of channel
+        # print (predict.data)
+        loss = self.loss_func(input=predict, target=labels)
+        loss.backward()  # compute the gradients of the weights
+        self.optimizer.step()  # this changes the weights and the bias using the learningrate and gradients
+        self.target_model.parameters()
 def run_cart_pole():
     """
     Run instances of cart-pole gym and tally scores.
@@ -176,10 +208,9 @@ def run_cart_pole():
             state_next, reward, terminal, info = env.step(action)
             if terminal:
                 if steps> 500:
-                    rewards *= -5
+                    reward *= -5
                 else:
-                    rewards *= 5
-            reward = reward if not terminal else -reward
+                    reward *= 5
 
             # print(episode, ". ",state_next, reward, terminal, info)
 
