@@ -71,12 +71,14 @@ class NNHandler:
         self.verbose: bool = False
         self.histories = [[], []]
         self.loaders = []
+        self.clip_grad = False
     @classmethod
     def complete_init(cls, sets_of_data, batch_size, model, loss_func, optimizer, lr, correctness=lambda x, y: x == y):
         myNNHandler=cls()
         myNNHandler.load_data(sets_of_data, batch_size)
         myNNHandler.load_model(model, loss_func, optimizer, lr)
         myNNHandler.load_correctness(correctness)
+
         return myNNHandler
 
 
@@ -141,7 +143,7 @@ class NNHandler:
         ######
         return [loss.item(), acc]
 
-    def train(self, epochs, trainInd=0, evalInd=None, print_verbose=False, graph_verbose=False, clip_grad=False, graphRate=10):
+    def train(self, epochs, trainInd=0, evalInd=None, print_verbose=False, graph_verbose=False, graphRate=10):
         # TODO:evalInd to have test data too (maybe)
         """
 
@@ -165,8 +167,8 @@ class NNHandler:
                 predict = self.model(X)  # squeeze and relu reduce # of channel
                 # print (predict.data)
                 loss = self.loss_func(input=predict.squeeze(), target=y)
-                if clip_grad:
-                    nn.utils.clip_grad_norm_(self.model.parameters(),1)
+                if self.clip_grad:
+                    nn.utils.clip_grad_norm_(self.model.parameters(),self.clip_grad)
                 loss.backward()  # compute the gradients of the weights
 
                 self.optimizer.step()  # this changes the weights and the bias using the learningrate and gradients
