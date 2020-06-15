@@ -44,7 +44,7 @@ class DynamicTDS(data.TensorDataset):  # stands for Dynamic TensorDataset
 # TODO: Add memory (tensor state, reward, next, number for action), Add adding obs, override load data with take from memory, override train
 class DQNHandler(NNHandler):
     def __init__(self, observation_space, action_space, MLPDesc, batchSize=64, gamma=0.995, max_mem=10000,
-                 expl_decay=0.993, expl_min=0.1):
+                 expl_decay=0.993, expl_min=0.1, clip_grad=False):
         super().__init__()
         self.custom_load_model(MLPDesc)
         self.load_correctness(lambda x, y: abs(x - y))
@@ -53,6 +53,7 @@ class DQNHandler(NNHandler):
         self.expl_decay = expl_decay
         self.expl_min = expl_min
         self.expl_rate=1
+        self.clip_grad=clip_grad
         # uneeded
         # self.inSize = accumMult(observation_space.shape)
         # assert self.inSize==MLPDesc[0], "insize {} !=observation total dimension {}".format(self.inSize,MLPDesc[0])
@@ -93,7 +94,8 @@ class DQNHandler(NNHandler):
         #     return -1
 
         self.optimizer.zero_grad()
-        utils.clip_grad_norm_(self.model.parameters(),3)
+        if self.clip_grad:
+            utils.clip_grad_norm_(self.model.parameters(),self.clip_grad)
         # utils.clip_grad_value_(self.model.parameters(),1)
         predict = self.model(states)  # squeeze and relu reduce # of channel
         # print (predict.data)
@@ -111,11 +113,7 @@ class DQNHandler(NNHandler):
 
         new_args = [torch.as_tensor(args[i]).unsqueeze(0).float() for i in range(len(args))]
         new_args[1]=new_args[1].int()
-        if new_args[4]:
-            if new_args[5] > 500:
-                new_args[2] *= -5
-            else:
-                new_args[2] *= 5
+
         if new_args[5]==0:
             self.expl_rate*=self.expl_decay
 
@@ -147,7 +145,7 @@ def run_cart_pole():
     env._max_episode_steps = MAX_STEPS
 
     # Create an instance of the agent.
-    cp_agent = DQNHandler(env.observation_space, env.action_space, [4, 8, 'sig', 8,'sig', 2, 'MSE', 'SGD', 0.05])
+    cp_agent = DQNHandler(env.observation_space, env.action_space, [4, 8, 'sig', 8,'sig', 2, 'MSE', 'SGD', 0.05], clip_grad=3)
     avg_reward, win_streak = (0, 0)
     rewards = []
     losses = []
@@ -176,6 +174,11 @@ def run_cart_pole():
             #         state_next=state
             #     action=int((np.sign(state_next[3] + state_next[2]) + 1) / 2)
             state_next, reward, terminal, info = env.step(action)
+            if terminal:
+                if steps> 500:
+                    rewards *= -5
+                else:
+                    rewards *= 5
             reward = reward if not terminal else -reward
 
             # print(episode, ". ",state_next, reward, terminal, info)
