@@ -23,6 +23,7 @@ class _RepeatSampler(object):
         while True:
             yield from iter(self.sampler)
 
+
 class FastDataLoader(data.dataloader.DataLoader):
 
     def __init__(self, *args, **kwargs):
@@ -36,10 +37,12 @@ class FastDataLoader(data.dataloader.DataLoader):
     def __iter__(self):
         for i in range(len(self)):
             yield next(self.iterator)
+
     def add_data(self, new_data):
         print(self.dataset)
-        self.dataset=data.dataset.ConcatDataset([self.dataset,new_data])
+        self.dataset = data.dataset.ConcatDataset([self.dataset, new_data])
         print(self.dataset)
+
 
 ACTIVATIONS = {
     "r": nn.ReLU,
@@ -48,14 +51,13 @@ ACTIVATIONS = {
 }
 LOSSES = {
     "MSE": nn.MSELoss,
-    "CE":nn.CrossEntropyLoss,
-    "BCELog":nn.BCEWithLogitsLoss
+    "CE": nn.CrossEntropyLoss,
+    "BCELog": nn.BCEWithLogitsLoss
 }
 OPTIMIZERS = {
     "SGD": optim.SGD,
     "ADAM": optim.Adam
 }
-
 
 
 class NNHandler:
@@ -72,15 +74,15 @@ class NNHandler:
         self.histories = [[], []]
         self.loaders = []
         self.clip_grad = False
+
     @classmethod
     def complete_init(cls, sets_of_data, batch_size, model, loss_func, optimizer, lr, correctness=lambda x, y: x == y):
-        myNNHandler=cls()
+        myNNHandler = cls()
         myNNHandler.load_data(sets_of_data, batch_size)
         myNNHandler.load_model(model, loss_func, optimizer, lr)
         myNNHandler.load_correctness(correctness)
 
         return myNNHandler
-
 
     def print_alt(self, *args):
         if self.verbose == True:
@@ -95,28 +97,29 @@ class NNHandler:
         """
         for i in range(len(sets_of_data)):
             self.loaders.append(FastDataLoader(sets_of_data[i], batch_size=batch_size[i], shuffle=True, num_workers=2))
+
     # def add_data(self, data, dataset_ind):
     #     self.loaders[dataset_ind].add_data(data)
-    def custom_load_model(self,descriptor):
+    def custom_load_model(self, descriptor):
         """
         :param descriptor: [model stuff, loss_func, optimizer, lr]
         :return:
         """
-        self.model=nn.Sequential()
-        in_size=descriptor[0]
-        depth=1
+        self.model = nn.Sequential()
+        in_size = descriptor[0]
+        depth = 1
         for i in descriptor[1:-3]:
             if type(i) is int:
-                self.model.add_module("{}: linear {},{}".format(depth, in_size,i), nn.Linear(in_size, i))
+                self.model.add_module("{}: linear {},{}".format(depth, in_size, i), nn.Linear(in_size, i))
                 in_size = i
             else:
-                self.model.add_module("{}: {}".format(depth, i),ACTIVATIONS[i]())
-            depth+=1
-        self.loss_func=LOSSES[descriptor[-3]]()
+                self.model.add_module("{}: {}".format(depth, i), ACTIVATIONS[i]())
+            depth += 1
+        self.loss_func = LOSSES[descriptor[-3]]()
         self.lr = descriptor[-1]
-        self.optimizer=OPTIMIZERS[descriptor[-2]](self.model.parameters(), self.lr)
+        self.optimizer = OPTIMIZERS[descriptor[-2]](self.model.parameters(), self.lr)
 
-    def load_model(self, model, loss_func,optimizer, lr, use_string=False):
+    def load_model(self, model, loss_func, optimizer, lr, use_string=False):
         ######
 
         self.model = model
@@ -129,7 +132,7 @@ class NNHandler:
     def load_correctness(self, correctness=lambda x, y: x == y):
         self.correctness = correctness
 
-    def eval_losses_accs(self, ind): #requires correctness
+    def eval_losses_accs(self, ind):  # requires correctness
         X, y = next(iter(self.loaders[ind]))
 
         total_corr = 0
@@ -139,7 +142,7 @@ class NNHandler:
 
         acc = float(sum(self.correctness(predict, y).float())) / len(y)
         # loss
-        loss = self.loss_func(input=predict.squeeze(), target=y)
+        loss = self.loss_func(input=predict, target=y)
         ######
         return [loss.item(), acc]
 
@@ -166,9 +169,9 @@ class NNHandler:
 
                 predict = self.model(X)  # squeeze and relu reduce # of channel
                 # print (predict.data)
-                loss = self.loss_func(input=predict.squeeze(), target=y)
+                loss = self.loss_func(input=predict, target=y)
                 if self.clip_grad:
-                    nn.utils.clip_grad_norm_(self.model.parameters(),self.clip_grad)
+                    nn.utils.clip_grad_norm_(self.model.parameters(), self.clip_grad)
                 loss.backward()  # compute the gradients of the weights
 
                 self.optimizer.step()  # this changes the weights and the bias using the learningrate and gradients
@@ -207,6 +210,7 @@ class NNHandler:
                 plt.ylabel('Accuracy')
                 plt.show()
                 # TODO: Add maybe time
+
     def save_to_file(self, path_name, continue_train=True):
         if continue_train:
             state = {
@@ -218,27 +222,31 @@ class NNHandler:
             torch.save(state, path_name)
         else:
             torch.save(self.model, path_name)
-    def load_from_file(self, path_name,continue_train=True):
+
+    def load_from_file(self, path_name, continue_train=True):
         if continue_train:
             state = torch.load(path_name)
-            self.lr=state['lr']
+            self.lr = state['lr']
             self.model.load_state_dict(state['model'])
             self.optimizer.load_state_dict(state['optimizer'])
             self.histories = [[], []]
         else:
             torch.save(self.model, path_name)
+
     def print_model(self):
-        batch_in=next(iter(self.loaders[0]))[0]
+        batch_in = next(iter(self.loaders[0]))[0]
         summary(self.model, batch_in.shape)
+
+
 if __name__ == "__main__":
     possibleRes = torch.as_tensor(np.array([0, 1])).float()
 
     tttIn = np.random.randint(0, 2, [100, 9])
     tttOut = np.array(
         [[(tttIn[i, 0] and tttIn[i, 4] and tttIn[i, 8]) or (tttIn[i, 2] and tttIn[i, 4] and tttIn[i, 6]) for i in
-         range(100)]])
-    tttOutNot=(tttOut+1)%2
-    tttOut=np.concatenate([tttOut,tttOutNot], axis=0).transpose()
+          range(100)]]).transpose()
+    # tttOutNot = (tttOut + 1) % 2
+    # tttOut = np.concatenate([tttOut, tttOutNot], axis=0).transpose()
     tttData = data.TensorDataset(torch.as_tensor(tttIn).float(), torch.as_tensor(tttOut).float())
 
     model = nn.Linear(9, 1)
@@ -246,11 +254,12 @@ if __name__ == "__main__":
 
     lr = 0.1
     optimizer = optim.SGD(model.parameters(), lr)
-    loss_func=nn.MSELoss()
-    correctness=lambda x, y: torch.eq(torch.argmin((x - possibleRes).abs(), dim=1).float(), y)
-    myNNHandler = NNHandler.complete_init([tttData], [len(tttData)],model, loss_func, optimizer,lr,correctness=correctness)
+    loss_func = nn.MSELoss()
+    correctness = lambda x, y: torch.eq(torch.argmin((x - possibleRes).abs(), dim=1,keepdim=True).float(), y)
+    myNNHandler = NNHandler.complete_init([tttData], [len(tttData)], model, loss_func, optimizer, lr,
+                                          correctness=correctness)
     # myNNHandler.add_data(tttData, 0)
-    myNNHandler.custom_load_model([9,5,'r',2,'MSE','ADAM',0.01])
+    myNNHandler.custom_load_model([9, 5, 'r', 1, 'MSE', 'ADAM', 0.01])
     myNNHandler.train(60, print_verbose=True, graph_verbose=True)
     # myNNHandler.save_to_file('model.pt')
     #
