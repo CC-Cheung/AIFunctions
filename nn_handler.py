@@ -76,7 +76,7 @@ class NNHandler:
         self.clip_grad = False
 
     @classmethod
-    def complete_init(cls, sets_of_data, batch_size, model, loss_func, optimizer, lr, correctness=lambda x, y: x == y):
+    def complete_init(cls, sets_of_data, batch_size, model, loss_func, optimizer, lr, correctness):
         myNNHandler = cls()
         myNNHandler.load_data(sets_of_data, batch_size)
         myNNHandler.load_model(model, loss_func, optimizer, lr)
@@ -88,7 +88,7 @@ class NNHandler:
         model = nn.Sequential()
         in_size = descriptor[0]
         depth = 1
-        for i in descriptor:
+        for i in descriptor[1:]:
             if type(i) is int:
                 model.add_module("{}: linear {},{}".format(depth, in_size, i), nn.Linear(in_size, i))
                 in_size = i
@@ -132,18 +132,18 @@ class NNHandler:
 
         ######
 
-    def load_correctness(self, correctness=lambda x, y: x == y):
+    def load_correctness(self,correctness):
         self.correctness = correctness
 
     def eval_losses_accs(self, ind):  # requires correctness
         X, y = next(iter(self.loaders[ind]))
-
-        total_corr = 0
-
-        # accuracy
         predict = self.model(X)
 
-        acc = float(sum(self.correctness(predict, y).float())) / len(y)
+        # accuracy
+        if self.correctness is None:
+            acc=-1
+        else:
+            acc = float(sum(self.correctness(predict, y).float())) / len(y)
         # loss
         loss = self.loss_func(input=predict, target=y)
         ######
@@ -260,11 +260,14 @@ if __name__ == "__main__":
     loss_func = nn.MSELoss()
     correctness = lambda x, y: torch.eq(torch.argmin((x - possibleRes).abs(), dim=1,keepdim=True).float(), y)
     myNNHandler = NNHandler.complete_init([tttData], [len(tttData)], model, loss_func, optimizer, lr,
-                                          correctness=correctness)
+                                          correctness)
     # myNNHandler.add_data(tttData, 0)
-    myNNHandler.custom_load_model([9, 5, 'r', 1, 'MSE', 'ADAM', 0.01])
-    a=next(iter(myNNHandler.model.parameters()))
-    a.data*=2
+    myNNHandler.custom_load_model([9, 5, 'r',5, 1, 'MSE', 'ADAM', 0.005])
+    print(myNNHandler.model)
+    # c=iter(myNNHandler.model.parameters())
+    # a=next(c)
+    # a.data*=2
+    # a=next(c)
     myNNHandler.train(60, print_verbose=True, graph_verbose=True)
     # myNNHandler.save_to_file('model.pt')
     #
