@@ -83,7 +83,19 @@ class NNHandler:
         myNNHandler.load_correctness(correctness)
 
         return myNNHandler
-
+    @classmethod
+    def custom_nn(cls, descriptor):
+        model = nn.Sequential()
+        in_size = descriptor[0]
+        depth = 1
+        for i in descriptor:
+            if type(i) is int:
+                model.add_module("{}: linear {},{}".format(depth, in_size, i), nn.Linear(in_size, i))
+                in_size = i
+            else:
+                model.add_module("{}: {}".format(depth, i), ACTIVATIONS[i]())
+            depth += 1
+        return model
     def print_alt(self, *args):
         if self.verbose == True:
             print(*args)
@@ -105,16 +117,7 @@ class NNHandler:
         :param descriptor: [model stuff, loss_func, optimizer, lr]
         :return:
         """
-        self.model = nn.Sequential()
-        in_size = descriptor[0]
-        depth = 1
-        for i in descriptor[1:-3]:
-            if type(i) is int:
-                self.model.add_module("{}: linear {},{}".format(depth, in_size, i), nn.Linear(in_size, i))
-                in_size = i
-            else:
-                self.model.add_module("{}: {}".format(depth, i), ACTIVATIONS[i]())
-            depth += 1
+        self.model = NNHandler.custom_nn(descriptor[:-3])
         self.loss_func = LOSSES[descriptor[-3]]()
         self.lr = descriptor[-1]
         self.optimizer = OPTIMIZERS[descriptor[-2]](self.model.parameters(), self.lr)
@@ -260,6 +263,8 @@ if __name__ == "__main__":
                                           correctness=correctness)
     # myNNHandler.add_data(tttData, 0)
     myNNHandler.custom_load_model([9, 5, 'r', 1, 'MSE', 'ADAM', 0.01])
+    a=next(iter(myNNHandler.model.parameters()))
+    a.data*=2
     myNNHandler.train(60, print_verbose=True, graph_verbose=True)
     # myNNHandler.save_to_file('model.pt')
     #

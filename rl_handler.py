@@ -135,16 +135,17 @@ class DQNHandler(NNHandler):
 
 class DDQNHandler(DQNHandler):
     def __init__(self, observation_space, action_space, MLPDesc, batchSize=64, gamma=0.995, max_mem=10000,
-                 expl_decay=0.993, expl_min=0.1, clip_grad=False, tau=0.1,target_model_update_rate=10):
+                 expl_decay=0.993, expl_min=0.1, clip_grad=False, tau=0.2,target_model_update_rate=10):
         super().__init__(observation_space, action_space, MLPDesc, batchSize=batchSize, gamma=gamma, max_mem=max_mem,
                  expl_decay=expl_decay, expl_min=expl_min, clip_grad=clip_grad)
         self.tau=tau
-        self.target_model=self.custom_load_model(MLPDesc)
+        self.target_model=self.custom_nn(MLPDesc[:-3])
+        self.target_model.load_state_dict(self.model.state_dict())
         self.target_model_update_rate=target_model_update_rate
         self.num_updates=0
     def update(self, *args):
         self.num_updates+=1
-        super().update(args)
+        return super().update(*args)
     def train(self):
         states, actions, rewards, next_states, terminals = next(
             iter(self.loaders[0]))  # TODO: add more efficient method
@@ -155,7 +156,7 @@ class DDQNHandler(DQNHandler):
         # labels = rewards + (self.gamma * labels_next * (1 - terminals))
         labels = self.model(states)
         max_next = self.model(next_states).detach().max(1)[1]  # 0=val, 1=index
-        max_next= self.target_model(next_states)[max_next]
+        max_next= self.target_model(next_states)[torch.arange(states.shape[0]),max_next]
         for i in range(labels.shape[0]):
             labels[i, actions[i]] = rewards[i] + self.gamma * max_next[i] * (1 - terminals[i])
 
@@ -171,10 +172,11 @@ class DDQNHandler(DQNHandler):
         loss = self.loss_func(input=predict, target=labels)
         loss.backward()  # compute the gradients of the weights
         self.optimizer.step()  # this changes the weights and the bias using the learningrate and gradients
-        if self.num_updates % self.target_model_update_rate:
+        if self.num_updates % self.target_model_update_rate==0:
             #https://github.com/xkiwilabs/DQN-using-PyTorch-and-ML-Agents/blob/master/dqn_agent.py
             for target_param, local_param in zip(self.target_model.parameters(), self.model.parameters()):
                 target_param.data.copy_(self.tau * local_param.data + (1.0 - self.tau) * target_param.data)
+        return loss.data
 
 def run_cart_pole():
     """
@@ -188,7 +190,7 @@ def run_cart_pole():
     env._max_episode_steps = MAX_STEPS
 
     # Create an instance of the agent.
-    cp_agent = DQNHandler(env.observation_space, env.action_space, [4, 8, 'sig', 8,'sig', 2, 'MSE', 'SGD', 0.05], clip_grad=3)
+    cp_agent = DDQNHandler(env.observation_space, env.action_space, [4, 8, 'sig', 8,'sig', 2, 'MSE', 'SGD', 0.08])
     avg_reward, win_streak = (0, 0)
     rewards = []
     losses = []
@@ -218,10 +220,7 @@ def run_cart_pole():
             #     action=int((np.sign(state_next[3] + state_next[2]) + 1) / 2)
             state_next, reward, terminal, info = env.step(action)
             if terminal:
-                if steps> 500:
-                    reward *= -5
-                else:
-                    reward *= 5
+                reward *= 5
 
             # print(episode, ". ",state_next, reward, terminal, info)
 
