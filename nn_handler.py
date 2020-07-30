@@ -11,7 +11,6 @@ from torchsummary import summary
 # from https://github.com/pytorch/pytorch/issues/15849
 class _RepeatSampler(object):
     """ Sampler that repeats forever.
-
     Args:
         sampler (Sampler)
     """
@@ -25,7 +24,6 @@ class _RepeatSampler(object):
 
 
 class FastDataLoader(data.dataloader.DataLoader):
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         object.__setattr__(self, 'batch_sampler', _RepeatSampler(self.batch_sampler))
@@ -42,8 +40,12 @@ class FastDataLoader(data.dataloader.DataLoader):
         print(self.dataset)
         self.dataset = data.dataset.ConcatDataset([self.dataset, new_data])
         print(self.dataset)
-
-
+#TODO: fix the messed up notation
+ARCHITECTURES = {
+    "lin":nn.Linear,
+    "conv": nn.Conv2d,
+    "lstm": nn.LSTM
+}
 ACTIVATIONS = {
     "r": nn.ReLU,
     "sig": nn.Sigmoid,
@@ -110,8 +112,6 @@ class NNHandler:
         for i in range(len(sets_of_data)):
             self.loaders.append(FastDataLoader(sets_of_data[i], batch_size=batch_size[i], shuffle=True, num_workers=2))
 
-    # def add_data(self, data, dataset_ind):
-    #     self.loaders[dataset_ind].add_data(data)
     def custom_load_model(self, descriptor):
         """
         :param descriptor: [model stuff, loss_func, optimizer, lr]
@@ -122,15 +122,12 @@ class NNHandler:
         self.lr = descriptor[-1]
         self.optimizer = OPTIMIZERS[descriptor[-2]](self.model.parameters(), self.lr)
 
-    def load_model(self, model, loss_func, optimizer, lr, use_string=False):
-        ######
-
+    def load_model(self, model, loss_func, optimizer, lr):
         self.model = model
         self.optimizer = optimizer
         self.lr = lr
         self.loss_func = loss_func
 
-        ######
 
     def load_correctness(self,correctness):
         self.correctness = correctness
@@ -146,7 +143,7 @@ class NNHandler:
             acc = float(sum(self.correctness(predict, y).float())) / len(y)
         # loss
         loss = self.loss_func(input=predict, target=y)
-        ######
+
         return [loss.item(), acc]
 
     def train(self, epochs, trainInd=0, evalInd=None, print_verbose=False, graph_verbose=False, graphRate=10):
@@ -171,15 +168,12 @@ class NNHandler:
                 # https://towardsdatascience.com/understanding-pytorch-with-an-example-a-step-by-step-tutorial-81fc5f8c4e8e
 
                 predict = self.model(X)  # squeeze and relu reduce # of channel
-                # print (predict.data)
                 loss = self.loss_func(input=predict, target=y)
                 if self.clip_grad:
                     nn.utils.clip_grad_norm_(self.model.parameters(), self.clip_grad)
                 loss.backward()  # compute the gradients of the weights
 
-                self.optimizer.step()  # this changes the weights and the bias using the learningrate and gradients
-
-                #   compute the accuracy of the model on the validation data  (don't normally do this every epoch, but is OK here)
+                self.optimizer.step()
 
             # record data for plotting
 

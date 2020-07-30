@@ -42,10 +42,9 @@ class DynamicTDS(data.TensorDataset):  # stands for Dynamic TensorDataset
             self.tensors[i] = torch.cat((self.tensors[i], tensors[i]), 0)
 
 
-# TODO: Add memory (tensor state, reward, next, number for action), Add adding obs, override load data with take from memory, override train
 class DQNHandler(NNHandler):
     def __init__(self, observation_space, action_space, MLPDesc, batchSize=64, gamma=0.995, max_mem=10000,
-                 expl_decay=0.993, expl_min=0.1, clip_grad=False):
+                 expl_decay=0.993, expl_min=0.1, clip_grad=False): #TODO make use of obs and act spaces
         super().__init__()
         self.custom_load_model(MLPDesc)
         self.load_correctness(lambda x, y: abs(x - y))
@@ -55,14 +54,7 @@ class DQNHandler(NNHandler):
         self.expl_min = expl_min
         self.expl_rate=1
         self.clip_grad=clip_grad
-        # uneeded
-        # self.inSize = accumMult(observation_space.shape)
-        # assert self.inSize==MLPDesc[0], "insize {} !=observation total dimension {}".format(self.inSize,MLPDesc[0])
-        # self.observation_space=observation_space
-        #
-        # self.outSize = action_space.n
-        # assert self.outSize == MLPDesc[-2], "outsize {} !=action total dimension {}".format(self.outSize, MLPDesc[-2])
-        # self.action_space=action_space
+
 
         self.load_data([DynamicTDS(max_mem)], [batchSize])
         self.stop = False
@@ -81,25 +73,16 @@ class DQNHandler(NNHandler):
 
         states, actions, rewards, next_states, terminals = next(
             iter(self.loaders[0]))  # TODO: add more efficient method
-
-        # with torch.no_grad():
-        #     labels_next = self.model(next_states).detach().max(1)[0].unsqueeze(1)
-        #
-        # labels = rewards + (self.gamma * labels_next * (1 - terminals))
         labels=self.model(states)
         max_next=self.model(next_states).detach().max(1)[0] #0=val, 1=index
         for i in range(labels.shape[0]):
             labels[i, actions[i]]= rewards[i]+self.gamma*max_next[i]*(1-terminals[i])
-
-        # if self.stop:
-        #     return -1
 
         self.optimizer.zero_grad()
         if self.clip_grad:
             utils.clip_grad_norm_(self.model.parameters(),self.clip_grad)
         # utils.clip_grad_value_(self.model.parameters(),1)
         predict = self.model(states)  # squeeze and relu reduce # of channel
-        # print (predict.data)
         loss = self.loss_func(input=predict, target=labels)
         loss.backward()  # compute the gradients of the weights
         self.optimizer.step()  # this changes the weights and the bias using the learningrate and gradients
@@ -150,18 +133,11 @@ class DDQNHandler(DQNHandler):
         states, actions, rewards, next_states, terminals = next(
             iter(self.loaders[0]))  # TODO: add more efficient method
 
-        # with torch.no_grad():
-        #     labels_next = self.model(next_states).detach().max(1)[0].unsqueeze(1)
-        #
-        # labels = rewards + (self.gamma * labels_next * (1 - terminals))
         labels = self.model(states)
         max_next = self.model(next_states).detach().max(1)[1]  # 0=val, 1=index
         max_next= self.target_model(next_states)[torch.arange(states.shape[0]),max_next]
         for i in range(labels.shape[0]):
             labels[i, actions[i]] = rewards[i] + self.gamma * max_next[i] * (1 - terminals[i])
-
-        # if self.stop:
-        #     return -1
 
         self.optimizer.zero_grad()
         if self.clip_grad:
@@ -210,27 +186,17 @@ def run_cart_pole():
         for steps in range(MAX_STEPS):
             env.render()
             count += 1
-            # Ask the agent for the next action and step accordingly.
-            # action = cp_agent.action(state)
             action = cp_agent.action(state)
-            # action=0
-            # if episode>30:
-            #     if episode==31:
-            #         state_next=state
-            #     action=int((np.sign(state_next[3] + state_next[2]) + 1) / 2)
+
             state_next, reward, terminal, info = env.step(action)
             if terminal:
                 reward *= 5
-
-            # print(episode, ". ",state_next, reward, terminal, info)
 
             # Update any information inside the agent, if desired.
 
             losses.append(cp_agent.update(state, action, reward, state_next, terminal,steps))
             if losses[-1] > 1000000:
                 print("high")
-                # exit=True
-                # break
 
             episode_reward += reward  # Total reward for this episode.
             state = state_next
