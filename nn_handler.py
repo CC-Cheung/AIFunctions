@@ -61,7 +61,15 @@ OPTIMIZERS = {
     "ADAM": optim.Adam
 }
 
+def conv_dim_calc(input_size, pad, kernel, dilation, stride):
+    # size= 1 + n*stride
 
+    #total size = input_size[i]+2*pad[i]
+    #total kernel size= (kernel[i]-1)*dilation+1
+    #total available squares to start a kernel = total size - total kernel size + 1
+    #new dim= (total available squares to start a kernel - 1)// stride + 1
+
+    return [(input_size[i]+2*pad[i] - ((kernel[i]-1)*dilation+1))//stride+1 for i in range(len(input_size))]
 class NNHandler:
     # TODO: add return information (history, epochs...)
     model: nn.Module
